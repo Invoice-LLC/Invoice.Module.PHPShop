@@ -2,7 +2,7 @@
 
 <h3>Установка</h3>
 
-1. [Скачайте плагин](https://github.com/Invoice-LLC/Invoice.Module.WooCommerce/archive/master.zip) и скопируйте содержимое архива в корень сайта
+1. [Скачайте плагин](https://github.com/Invoice-LLC/Invoice.Module.PHPShop/archive/master.zip) и скопируйте содержимое архива в корень сайта
 2. В файле %корень сайта%/phpshop/inc/config.php,  добавьте строчки
 ```
 [invoice]
