@@ -7,6 +7,10 @@ require "InvoiceSDK/common/SETTINGS.php";
 require "InvoiceSDK/common/ORDER.php";
 require "InvoiceSDK/CREATE_TERMINAL.php";
 require "InvoiceSDK/CREATE_PAYMENT.php";
+require "InvoiceSDK/GET_TERMINAL.php";
+require "InvoiceSDK/common/ITEM.php";
+
+use PHPShopCart;
 
 class Invoice
 {
@@ -20,6 +24,8 @@ class Invoice
     public function createTerminal() {
         $request = new CREATE_TERMINAL("PHPShop");
         $request->type = "dynamical";
+        $request->description = "PHPShop module";
+        $request->defaultPrice = "10";
 
         $this->log(json_encode($request));
         $info = $this->restClient->CreateTerminal($request);
@@ -44,16 +50,15 @@ class Invoice
         $this->checkOrCreateTerminal();
         $terminal = $this->getTerminal();
 
-        $order = new INVOICE_ORDER($amount);
-        $order->id = $id;
-        $settings = new SETTINGS($terminal);
-        $settings->success_url = ( ((!empty($_SERVER['HTTPS'])) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST']);
-
-        $request = new CREATE_PAYMENT($order, $settings, null);
+        $request = new CREATE_PAYMENT();
+        $request->order = $this->getOrder($amount, $id);
+        $request->settings = $this->getSettings($terminal);
+        $request->receipt = $this->getReceipt();
 
         $this->log(json_encode($request));
         $info = $this->restClient->CreatePayment($request);
-        $this->log(json_encode($info));
+        $this->log(json_encode($info));  
+
         if($info == null or $info->error != null) {
             $this->sendAlert("Не удалось создать платеж");
             return "/";
@@ -62,10 +67,59 @@ class Invoice
         }
     }
 
+    /**
+     * @return INVOICE_ORDER
+     */
+
+    private function getOrder($amount, $id) {
+        $order = new INVOICE_ORDER();
+        $order->amount = $amount;
+        $order->id = $id;
+        $order->currency = "RUB";
+
+        return $order;
+    }
+
+    /**
+     * @return INVOICE_SETTINGS
+     */
+
+    private function getSettings($terminal) {
+        $url = ((!empty($_SERVER['HTTPS'])) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'];
+
+        $settings = new INVOICE_SETTINGS();
+        $settings->terminal_id = $terminal;
+        $settings->success_url = $url;
+        $settings->fail_url = $url;
+
+        return $settings;
+    }
+
+    /**
+     * @return ITEM
+     */
+
+    private function getReceipt() {
+        $receipt = array();
+        $order = new PHPShopCart();
+        $basket = $order->getArray();
+
+        foreach ($basket as $basketItem) {
+            $item = new ITEM();
+            $item->name = $basketItem['name'];
+            $item->price = $basketItem['price'];
+            $item->resultPrice = $basketItem['total'];
+            $item->quantity = $basketItem['num'];
+
+            array_push($receipt, $item);
+        }
+
+        return $receipt;
+    }
+
     public function callback($notification, $SysValue) {
         $type = $notification["notification_type"];
         $id = $notification["order"]["id"];
-
         $signature = $notification["signature"];
 
         if($signature != $this->getSignature($notification["id"], $notification["status"], $this->restClient->apiKey)) {
@@ -74,7 +128,6 @@ class Invoice
         }
 
         if($type == "pay") {
-
             if($notification["status"] == "successful") {
                 $this->setPaymentStatus(true,$id, $notification["order"]["amount"], $SysValue);
                 return "payment successful";
@@ -93,7 +146,6 @@ class Invoice
         return md5($id.$status.$key);
     }
 
-
     public function setPaymentStatus($paid, $id, $amount, $SysValue) {
         if(!$paid) return;
         $this->log("Result");
@@ -111,7 +163,6 @@ class Invoice
             return;
         }
 
-
         $arr = explode("-", $id);
         $inv_id = $arr[0]."".$arr[1];
 
@@ -125,7 +176,15 @@ class Invoice
     }
 
     public function getTerminal() {
-        return file_get_contents("invoice_tid");
+        $terminal = new GET_TERMINAL();
+        $terminal->alias = file_get_contents("invoice_tid");
+        $info = $this->restClient->GetTerminal($terminal);
+
+        if($info->id == null || $info->id != $terminal->alias){
+            return null;
+        } else {
+            return $info->id;
+        }
     }
 
     public function sendAlert($msg) {

@@ -12,14 +12,9 @@ $id = $_POST['ouid'];
 $invoice = new Invoice($login, $api_key);
 $payment_url = $invoice->createPayment($amount, $id);
 
-$disp= '
-<div align="center">
+$disp = header('Location: '.$payment_url);
 
-<a class="btn btn-info btn-lg" href="'.$payment_url.'">Pay</a>
-
-</div>';
-
-if($payment_url == "/") {
+if($payment_url == "/" || $payment_url == null) {
     $disp = '
     <div align="center">
 
