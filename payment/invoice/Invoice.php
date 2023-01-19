@@ -74,7 +74,7 @@ class Invoice
     private function getOrder($amount, $id) {
         $order = new INVOICE_ORDER();
         $order->amount = $amount;
-        $order->id = $id;
+        $order->id = "$id" . "-" . bin2hex(random_bytes(5));
         $order->currency = "RUB";
 
         return $order;
@@ -119,7 +119,7 @@ class Invoice
 
     public function callback($notification, $SysValue) {
         $type = $notification["notification_type"];
-        $id = $notification["order"]["id"];
+        $id = strstr($notification["order"]["id"], "-", true);
         $signature = $notification["signature"];
 
         if($signature != $this->getSignature($notification["id"], $notification["status"], $this->restClient->apiKey)) {
